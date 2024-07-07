@@ -8,6 +8,9 @@ import sys
 import errno
 import time
 
+from packet import SYN_FLAG_MASK, ACK_FLAG_MASK
+from random import randrange
+
 def has_been_acked(sock, seq):
     """
     Tells if a given sequence number has been acked by the socket.
@@ -34,6 +37,27 @@ def handle_message(sock, pkt):
         ackNum = socket.ntohl(tcpHeader.ackNum)
         if packet.after(ackNum, sock.window.lastAckReceived):
             sock.window.lastAckReceived = ackNum
+
+    elif flags & packet.SYN_FLAG_MASK:
+        syn_ack_seq = randrange(start = 0, stop=4_294_967_295)
+
+        payload = None
+        payloadLen = 0
+
+        extData = None
+        src = sock.myPort
+        dst = socket.ntohs(sock.conn.sinPort)
+        ack = socket.ntohl(tcpHeader.seqNum) + 1
+        hLen = len(packet.CaseTCP())
+        pLen = hLen
+        flags = packet.SYN_FLAG_MASK + packet.ACK_FLAG_MASK
+        advWindow = 1
+        syn_ack_pkt = create_packet(src, dst, syn_ack_seq, ack, hLen, pLen, flags, advWindow, extData, payload, payloadLen)
+
+        sock.sockFd.sendto(bytes(syn_ack_pkt), (sock.conn.sinAddr, dst))
+
+        sock.window.nextSeqExpected = socket.ntohl(tcpHeader.seqNum) + 1
+        sock.window.nextAckDesired = syn_ack_seq + 1
 
     else:
         seqNum = sock.window.lastAckReceived
@@ -183,3 +207,25 @@ def begin_backend(sock):
                 sock.waitCond.notify()
 
     sys.exit(0)
+
+# My code
+
+def create_syn_pkt(seq, src, dst):
+    hLen = len(packet.CaseTCP())
+    pLen = hLen
+    advWindow = 1
+
+    return create_packet(src, dst, seq, 1, hLen, pLen, SYN_FLAG_MASK, advWindow, None, b"", 0)
+
+def did_timeout(time_last_sent):
+    if time.time() - time_last_sent > DEFAULT_TIMEOUT:
+        return True
+    else:
+        return False
+    
+def create_ack_pkt(seq, ack, src, dst):
+    hLen = len(packet.CaseTCP())
+    pLen = hLen
+    advWindow = 1
+
+    return create_packet(src, dst, seq, ack, hLen, pLen, ACK_FLAG_MASK, advWindow, None, b"", 0)

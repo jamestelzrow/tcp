@@ -8,6 +8,12 @@ import ipaddress
 class Window(object):
     nextSeqExpected = 0
     lastAckReceived = 0
+    # This is equal to the sequence number of the last packet 
+    # we have sent, plus the length of that packet's payload.
+    # We use it to determine if the peer has received all the
+    # data that we sent.
+    nextAckDesired = 0
+
     def __init__(self):
         pass
 
@@ -47,3 +53,15 @@ class ReadMode(Enum):
     NO_FLAG = 0
     NO_WAIT = 1
     TIMEOUT = 2
+
+# My code
+
+class ClosingState(Enum):
+    ESTABLISHED = 0
+    FIN_WAIT_1 = 1
+    FIN_WAIT_2 = 2
+    TIME_WAIT = 3
+    CLOSE_WAIT = 4
+    LAST_ACK = 5
+    CLOSED = 6
+    CLOSING = 7

@@ -3,6 +3,15 @@ from backend import begin_backend
 import socket
 from threading import Thread, Lock, Condition
 
+# My code
+from grading import DEFAULT_TIMEOUT
+from random import randrange
+import select
+import errno
+import time
+import packet
+from backend import create_syn_pkt, did_timeout, create_ack_pkt
+
 EXIT_SUCCESS = 0
 EXIT_ERROR = 1
 EXIT_FAILURE = 1
@@ -15,7 +24,7 @@ def case_socket(sock, sockType, port, serverIP):
     sock.deathLock = Lock()
     sock.sockType = sockType
     sock.window = Window()
-    # TODO: to be updated
+
     sock.window.nextSeqExpected = 0
     sock.window.lastAckReceived = 0
 
@@ -36,6 +45,49 @@ def case_socket(sock, sockType, port, serverIP):
 
     myAddr, myPort = sockfd.getsockname()
     sock.myPort = socket.ntohs(myPort)
+
+    if sockType == SocketType.TCP_INITIATOR:
+        # seq field is 32 bit; we use largest 
+        # 32 bit integer as upper bound
+        syn_seq = randrange(start = 0, stop=4_294_967_295)
+        syn_msg = create_syn_pkt(seq = syn_seq, src = port, dst = socket.ntohs(sock.conn.sinPort))
+        got_synack = False
+        should_send_syn = True
+        synack_sent_time = 0
+        while not got_synack:
+            if should_send_syn:
+                sock.sockFd.sendto(bytes(syn_msg), (sock.conn.sinAddr, socket.ntohs(sock.conn.sinPort)))
+                should_send_syn = False
+                synack_sent_time = time.time()
+            else:
+                epoll = select.epoll()
+                epoll.register(sock.sockFd, select.EPOLLIN)
+                events = epoll.poll(DEFAULT_TIMEOUT)
+                if len(events):
+                    try:
+                        msg, _ = sock.sockFd.recvfrom(1024, socket.MSG_DONTWAIT|socket.MSG_PEEK)
+                        if len(msg) >= len(packet.CaseTCP()):
+                            tcpHeader = packet.CaseTCP(msg)
+                            pLen = socket.ntohs(tcpHeader.pLen)
+                            flags = tcpHeader.flags
+                            ack_num = socket.ntohl(tcpHeader.ackNum)
+                            if (flags & packet.SYN_FLAG_MASK) and (flags & packet.ACK_FLAG_MASK) and (ack_num == syn_seq + 1) and (pLen <= len(msg)):
+                                got_synack = True
+                                sock.window.lastAckReceived = socket.ntohl(tcpHeader.ackNum)
+                                sock.window.nextSeqExpected = socket.ntohl(tcpHeader.seqNum) + 1
+                                sock.window.nextAckDesired = syn_seq + 1
+                                sock.sockFd.recvfrom(pLen)
+                            else:
+                                should_send_syn = did_timeout(synack_sent_time)
+                    except IOError as e:
+                        if e.errno == errno.EWOULDBLOCK:
+                            should_send_syn = did_timeout(synack_sent_time)
+                else:
+                    should_send_syn = did_timeout(synack_sent_time)
+
+        # Now that we have received the SYN-ACK packet, we ACK it.
+        ack_msg = create_ack_pkt(seq = syn_seq, ack = sock.window.nextSeqExpected, src = port, dst = socket.ntohs(sock.conn.sinPort))
+        sock.sockFd.sendto(bytes(ack_msg), (sock.conn.sinAddr, socket.ntohs(sock.conn.sinPort)))
 
     t = Thread(target=begin_backend, args=(sock,), daemon=True)
     sock.thread = t
