@@ -48,6 +48,10 @@ class Socket(object):
     dying = 0
     deathLock = None
     window = None
+    # My code
+    closingState = 0
+    time_wait_start = 0
+    packet_sent_timestamp = 0
 
 class ReadMode(Enum):
     NO_FLAG = 0

@@ -1,4 +1,4 @@
-from tcp import Socket, Window, SocketType, SockaddrIn, ReadMode
+from tcp import Socket, Window, SocketType, SockaddrIn, ReadMode, ClosingState
 from backend import begin_backend
 import socket
 from threading import Thread, Lock, Condition
@@ -47,9 +47,7 @@ def case_socket(sock, sockType, port, serverIP):
     sock.myPort = socket.ntohs(myPort)
 
     if sockType == SocketType.TCP_INITIATOR:
-        # seq field is 32 bit; we use largest 
-        # 32 bit integer as upper bound
-        syn_seq = randrange(start = 0, stop=4_294_967_295)
+        syn_seq = randrange(start = 0, stop=1000)
         syn_msg = create_syn_pkt(seq = syn_seq, src = port, dst = socket.ntohs(sock.conn.sinPort))
         got_synack = False
         should_send_syn = True
@@ -88,6 +86,8 @@ def case_socket(sock, sockType, port, serverIP):
         # Now that we have received the SYN-ACK packet, we ACK it.
         ack_msg = create_ack_pkt(seq = syn_seq, ack = sock.window.nextSeqExpected, src = port, dst = socket.ntohs(sock.conn.sinPort))
         sock.sockFd.sendto(bytes(ack_msg), (sock.conn.sinAddr, socket.ntohs(sock.conn.sinPort)))
+
+    sock.closingState = ClosingState.ESTABLISHED
 
     t = Thread(target=begin_backend, args=(sock,), daemon=True)
     sock.thread = t
