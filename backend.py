@@ -24,9 +24,6 @@ def has_been_acked(sock, seq):
 
 def handle_message(sock, pkt):
     """
-    Updates the socket infomration to represent the newly received packet.
-    Currently, it also sends an acknowledgement for the packet.
-
     @param sock - The socket used for handling packets received
     @param pkt - The packet data received by the socket
     """
@@ -48,7 +45,6 @@ def handle_message(sock, pkt):
                 dst = dst
             )
             sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
-            print('Setting state TIME_WAIT')
             sock.closingState = ClosingState.TIME_WAIT
             sock.time_wait_start = time.time()
         else:
@@ -64,8 +60,6 @@ def handle_message(sock, pkt):
             if ackNum == sock.window.nextAckDesired:
                 sock.window.nextSeqExpected = socket.ntohl(tcpHeader.seqNum) + 1
                 sock.window.lastAckReceived = socket.ntohl(tcpHeader.ackNum)
-                print('Setting state FIN_WAIT_2')
-                print('updating nSE: {}, lAR: {}'.format(sock.window.nextSeqExpected, sock.window.lastAckReceived))
                 sock.closingState = ClosingState.FIN_WAIT_2
             else:
                 pass
@@ -78,16 +72,12 @@ def handle_message(sock, pkt):
         elif sock.closingState == ClosingState.LAST_ACK and ackNum == sock.window.nextAckDesired:
             sock.window.nextSeqExpected = socket.ntohl(tcpHeader.seqNum) + 1
             sock.window.lastAckReceived = socket.ntohl(tcpHeader.ackNum)
-            print('Setting state CLOSED')
-            print('updating nSE: {}, lAR: {}'.format(sock.window.nextSeqExpected, sock.window.lastAckReceived))
             sock.closingState = ClosingState.CLOSED
         elif sock.closingState == ClosingState.CLOSED:
             pass
         elif sock.closingState == ClosingState.CLOSING and ackNum == sock.window.nextAckDesired:
             sock.window.nextSeqExpected = socket.ntohl(tcpHeader.seqNum) + 1
             sock.window.lastAckReceived = socket.ntohl(tcpHeader.ackNum)
-            print('Setting state TIME_WAIT')
-            print('updating nSE: {}, lAR: {}'.format(sock.window.nextSeqExpected, sock.window.lastAckReceived))
             sock.closingState = ClosingState.TIME_WAIT
             sock.time_wait_start = time.time()
 
@@ -102,8 +92,6 @@ def handle_message(sock, pkt):
                 dst = dst
             )
             sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
-            print('Setting state CLOSE_WAIT')
-            print('updating nSE: {}, lAR: {}'.format(sock.window.nextSeqExpected, sock.window.lastAckReceived))
             sock.closingState = ClosingState.CLOSE_WAIT
         elif sock.closingState == ClosingState.FIN_WAIT_1:
             sock.window.nextSeqExpected = socket.ntohl(tcpHeader.seqNum) + 1
@@ -115,8 +103,6 @@ def handle_message(sock, pkt):
                 dst = dst
             )
             sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
-            print('Setting state CLOSING')
-            print('updating nSE: {}, lAR: {}'.format(sock.window.nextSeqExpected, sock.window.lastAckReceived))
             sock.closingState = ClosingState.CLOSING
         elif sock.closingState == ClosingState.FIN_WAIT_2:
             sock.window.nextSeqExpected = socket.ntohl(tcpHeader.seqNum) + 1
@@ -128,8 +114,6 @@ def handle_message(sock, pkt):
                 dst = dst
             )
             sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
-            print('Setting state TIME_WAIT')
-            print('updating nSE: {}, lAR: {}'.format(sock.window.nextSeqExpected, sock.window.lastAckReceived))
             sock.closingState = ClosingState.TIME_WAIT
             sock.time_wait_start = time.time()
         elif sock.closingState == ClosingState.TIME_WAIT:
@@ -275,11 +259,7 @@ def single_send(sock, data, bufLen):
             msg = create_packet(src, dst, seq, ack, hLen, pLen, flags, advWindow, extData, payload, payloadLen)
             bufLen -= payloadLen
 
-            while True:
-                sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
-                check_for_data(sock, ReadMode.TIMEOUT)
-                if has_been_acked(sock, seq):
-                    break
+            sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
 
             dataOffset = dataOffset[payloadLen:]
 
@@ -297,15 +277,12 @@ def begin_backend(sock):
                 src = sock.myPort
                 dst = socket.ntohs(sock.conn.sinPort)
                 if sock.closingState == ClosingState.ESTABLISHED:
-                    print('Sending fin seq: {} ack: {}'.format(seq, ack))
                     msg = create_fin_pkt(seq = seq, ack = ack, src = src, dst = dst)
                     sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
-                    print('Setting state FIN_WAIT_1')
                     sock.closingState = ClosingState.FIN_WAIT_1
                     sock.packet_sent_timestamp = time.time()
                 elif sock.closingState == ClosingState.FIN_WAIT_1:
                     if time.time() - sock.packet_sent_timestamp >= DEFAULT_TIMEOUT:
-                        print('Sending fin seq: {} ack: {}'.format(seq, ack))
                         msg = create_fin_pkt(seq = seq, ack = ack, src = src, dst = dst)
                         sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
                         sock.packet_sent_timestamp = time.time()
@@ -315,20 +292,16 @@ def begin_backend(sock):
                     pass
                 elif sock.closingState == ClosingState.TIME_WAIT:
                     if time.time() - sock.time_wait_start >= 2 * DEFAULT_TIMEOUT:
-                        print('Setting state CLOSED')
                         sock.closingState = ClosingState.CLOSED
                     else:
                         pass
                 elif sock.closingState == ClosingState.CLOSE_WAIT:
-                    print('Sending fin seq: {} ack: {}'.format(seq, ack))
                     msg = create_fin_pkt(seq = seq, ack = ack, src = src, dst = dst)
                     sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
-                    print('Setting state LAST_ACK')
                     sock.closingState = ClosingState.LAST_ACK
                     sock.packet_sent_timestamp = time.time()
                 elif sock.closingState == ClosingState.LAST_ACK:
                     if time.time() - sock.packet_sent_timestamp >= DEFAULT_TIMEOUT:
-                        print('Sending fin seq: {} ack: {}'.format(seq, ack))
                         msg = create_fin_pkt(seq = seq, ack = ack, src = src, dst = dst)
                         sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
                         sock.packet_sent_timestamp = time.time()
@@ -338,7 +311,6 @@ def begin_backend(sock):
                     break
                 elif sock.closingState == ClosingState.CLOSING:
                     if time.time() - sock.packet_sent_timestamp >= DEFAULT_TIMEOUT:
-                        print('Sending fin seq: {} ack: {}'.format(seq, ack))
                         msg = create_fin_pkt(seq = seq, ack = ack, src = src, dst = dst)
                         sock.sockFd.sendto(bytes(msg), (sock.conn.sinAddr, dst))
                         sock.packet_sent_timestamp = time.time()
