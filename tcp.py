@@ -6,13 +6,19 @@ import ipaddress
 
 
 class Window(object):
-    nextSeqExpected = 0
-    lastAckReceived = 0
-    # This is equal to the sequence number of the last packet 
-    # we have sent, plus the length of that packet's payload.
-    # We use it to determine if the peer has received all the
-    # data that we sent.
-    nextAckDesired = 0
+    # For receiving buffer
+    last_byte_read = 0
+    last_byte_rcvd = 0
+    next_byte_expected = 0
+    # For sending buffer
+    last_byte_acked = 0
+    last_byte_sent = 0
+    last_byte_written = 0
+
+    our_advertised_window = 0
+    peer_advertised_window = 0
+
+    time_since_last_new_ack_or_retrans = 0
 
     def __init__(self):
         pass
@@ -38,18 +44,16 @@ class Socket(object):
     myPort = None
     conn = None
     receivedBuf = b""
-    receivedLen = 0
     recvLock = None
-    waitCond = None
+    recvCond = None
     sendingBuf = b""
-    sendingLen = 0
-    sockType = None
     sendLock = None
+    sendCond = None
+    sockType = None
     dying = 0
     deathLock = None
     window = None
-    # My code
-    closingState = 0
+    state = 0
     time_wait_start = 0
     packet_sent_timestamp = 0
 
@@ -58,14 +62,15 @@ class ReadMode(Enum):
     NO_WAIT = 1
     TIMEOUT = 2
 
-# My code
-
-class ClosingState(Enum):
-    ESTABLISHED = 0
-    FIN_WAIT_1 = 1
-    FIN_WAIT_2 = 2
-    TIME_WAIT = 3
-    CLOSE_WAIT = 4
-    LAST_ACK = 5
-    CLOSED = 6
-    CLOSING = 7
+class TCPState(Enum):
+    SYN_SENT = 0
+    LISTEN = 1
+    SYN_RCVD = 2
+    ESTABLISHED = 3
+    FIN_WAIT_1 = 4
+    FIN_WAIT_2 = 5
+    TIME_WAIT = 6
+    CLOSE_WAIT = 7
+    LAST_ACK = 8
+    CLOSING = 9
+    CLOSED = 10
