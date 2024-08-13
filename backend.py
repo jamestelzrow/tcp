@@ -3,7 +3,7 @@ from packet import create_packet
 from tcp import ReadMode, TCPState
 import socket
 import select
-from grading import DEFAULT_TIMEOUT, MSS, WINDOW_SIZE
+from grading import DEFAULT_TIMEOUT, MSS, MAX_NETWORK_BUFFER
 import sys
 import errno
 import time
@@ -174,7 +174,7 @@ def handle_message(sock, pkt):
         syn_ack_packet_ack_num = packet_sequence_number + 1
         syn_ack_packet_src = sock.myPort
         syn_ack_packet_dst = socket.ntohs(sock.conn.sinPort)
-        syn_ack_packet_advertised_window = WINDOW_SIZE
+        syn_ack_packet_advertised_window = MAX_NETWORK_BUFFER
 
         syn_ack_packet_payload = None
         syn_ack_packet_payload_len = 0
@@ -226,14 +226,14 @@ def handle_message(sock, pkt):
         sock.window.last_byte_written = syn_ack_packet_seq_num
         sock.window.last_byte_sent = syn_ack_packet_seq_num
 
-        sock.window.our_advertised_window = WINDOW_SIZE
+        sock.window.our_advertised_window = MAX_NETWORK_BUFFER
         sock.window.peer_advertised_window = new_peer_advertised_window
 
         sock.state = TCPState.SYN_RCVD
 
         sock.sendingBuf = []
         sock.receivedBuf = []
-        for _ in range(WINDOW_SIZE):
+        for _ in range(MAX_NETWORK_BUFFER):
             sock.sendingBuf.append(None)
             sock.receivedBuf.append(None)
 
@@ -248,13 +248,13 @@ def handle_message(sock, pkt):
         payload_length = len(payload)
 
         if payload_length > 0:
-            if (sock.window.next_byte_expected - 1) - sock.window.last_byte_read < WINDOW_SIZE:
+            if (sock.window.next_byte_expected - 1) - sock.window.last_byte_read < MAX_NETWORK_BUFFER:
 
-                if packet_sequence_number <= sock.window.last_byte_read + WINDOW_SIZE and packet_sequence_number + payload_length > sock.window.next_byte_expected:
+                if packet_sequence_number <= sock.window.last_byte_read + MAX_NETWORK_BUFFER and packet_sequence_number + payload_length > sock.window.next_byte_expected:
                     # The sequence number is before the end of our receiving buffer, and the number of the final byte is after that of the last byte we received.
                     # So, this packet contains data within the range of our buffer.
                     payload_subset_start_idx = max(packet_sequence_number, sock.window.next_byte_expected)-packet_sequence_number
-                    payload_subset_end_idx = min(packet_sequence_number+payload_length, sock.window.last_byte_read + WINDOW_SIZE)-packet_sequence_number
+                    payload_subset_end_idx = min(packet_sequence_number+payload_length, sock.window.last_byte_read + MAX_NETWORK_BUFFER)-packet_sequence_number
                     payload_subset_to_accept = bytes(payload[payload_subset_start_idx:payload_subset_end_idx])
 
                     rcv_buff_starting_index_for_copy = max(packet_sequence_number, sock.window.next_byte_expected) - (sock.window.last_byte_read + 1)
@@ -269,7 +269,7 @@ def handle_message(sock, pkt):
                         new_next_byte_expected = sock.window.next_byte_expected
                         # Iterate through the receiving buffer beginning at the byte numbered sock.window.next_byte_expected and search for the first None value
                         # (We know we have already received every byte with a number less than sock.window.next_byte_expected)
-                        for rcv_buffer_idx in range(sock.window.next_byte_expected - (sock.window.last_byte_read + 1), WINDOW_SIZE):
+                        for rcv_buffer_idx in range(sock.window.next_byte_expected - (sock.window.last_byte_read + 1), MAX_NETWORK_BUFFER):
                             if sock.receivedBuf[rcv_buffer_idx] != None:
                                 new_next_byte_expected = new_next_byte_expected + 1
                             else:
@@ -279,7 +279,7 @@ def handle_message(sock, pkt):
                     if packet_sequence_number + payload_length - 1 > sock.window.last_byte_rcvd:
                         sock.window.last_byte_rcvd = packet_sequence_number + payload_length - 1
 
-                    sock.window.our_advertised_window = WINDOW_SIZE - ((sock.window.next_byte_expected - 1) - sock.window.last_byte_read)
+                    sock.window.our_advertised_window = MAX_NETWORK_BUFFER - ((sock.window.next_byte_expected - 1) - sock.window.last_byte_read)
 
                 else:
                     # The payload lies outside the range that we can accept in our receiving buffer.
@@ -451,7 +451,7 @@ def send(sock, our_advertised_window):
         sock.window.time_since_last_new_ack_or_retrans = time.time()
     elif not can_send_unsent_data and did_timeout:
         buffer_subset_start_index = 0
-        buffer_subset_end_index = min(WINDOW_SIZE, sock.window.last_byte_sent - sock.window.last_byte_acked)
+        buffer_subset_end_index = min(MAX_NETWORK_BUFFER, sock.window.last_byte_sent - sock.window.last_byte_acked)
         send_as_packets(
             buffer_subset_start_index,
             buffer_subset_end_index,

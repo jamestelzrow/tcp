@@ -1,0 +1,13 @@
+From server.py:
+
+R:  b'hi therehttps://www.youtube.com/watch?v=dQw4w9WgXcQhttps://www.youtube.com/watch?v=Yb6dZ1IFlKchttps://www.youtube.com/watch?v=xvFZjo5PgG0https://www.youtube.com/watch?v=8ybW48rKBMEhttps://www.youtube.com/watch?v=xfr64zoBTAQ'
+N:  223
+2R:  b'hi there'
+2N:  8
+N:  1426
+
+From client.py:
+
+receive:  b'hi there'
+R:  b'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+Read:  0

@@ -1,6 +1,6 @@
 from backend import begin_backend, create_ack_pkt, create_packet, did_timeout
 import errno
-from grading import DEFAULT_TIMEOUT, WINDOW_SIZE
+from grading import DEFAULT_TIMEOUT, MAX_NETWORK_BUFFER
 import packet
 from random import randrange
 import select
@@ -50,7 +50,7 @@ def case_socket(sock, sockType, port, serverIP):
         syn_packet_ack_num = 0
         syn_packet_src = sock.myPort
         syn_packet_dst = socket.ntohs(sock.conn.sinPort)
-        syn_packet_advertised_window = WINDOW_SIZE
+        syn_packet_advertised_window = MAX_NETWORK_BUFFER
 
         syn_packet_payload = None
         syn_packet_payload_len = 0
@@ -77,11 +77,11 @@ def case_socket(sock, sockType, port, serverIP):
         sock.window.last_byte_acked = syn_packet_seq_num - 1
         sock.window.last_byte_written = syn_packet_seq_num
         sock.window.last_byte_sent = syn_packet_seq_num
-        sock.window.our_advertised_window = WINDOW_SIZE
+        sock.window.our_advertised_window = MAX_NETWORK_BUFFER
 
         sock.sendingBuf = []
         sock.receivedBuf = []
-        for _ in range(WINDOW_SIZE):
+        for _ in range(MAX_NETWORK_BUFFER):
             sock.sendingBuf.append(None)
             sock.receivedBuf.append(None)
 
@@ -163,7 +163,7 @@ def case_close(sock):
     if sock is not None:
         sock.sendingBuf = []
         sock.receivedBuf = []
-        for _ in range(WINDOW_SIZE):
+        for _ in range(MAX_NETWORK_BUFFER):
             sock.sendingBuf.append(None)
             sock.receivedBuf.append(None)
 
@@ -198,7 +198,7 @@ def case_read(sock, buf, length, flags):
                 sock.receivedBuf.append(None)
 
             sock.window.last_byte_read = sock.window.last_byte_read + number_of_bytes_to_read
-            sock.window.our_advertised_window = WINDOW_SIZE - ((sock.window.next_byte_expected - 1) - sock.window.last_byte_read)
+            sock.window.our_advertised_window = MAX_NETWORK_BUFFER - ((sock.window.next_byte_expected - 1) - sock.window.last_byte_read)
 
             buf[0] = bytes(bytes_read)
             number_of_bytes_read = number_of_bytes_to_read
@@ -236,7 +236,7 @@ def case_read(sock, buf, length, flags):
             sock.receivedBuf.append(None)
 
         sock.window.last_byte_read = sock.window.last_byte_read + number_of_bytes_to_read
-        sock.window.our_advertised_window = WINDOW_SIZE - ((sock.window.next_byte_expected - 1) - sock.window.last_byte_read)
+        sock.window.our_advertised_window = MAX_NETWORK_BUFFER - ((sock.window.next_byte_expected - 1) - sock.window.last_byte_read)
 
         buf[0] = bytes(bytes_read)
         number_of_bytes_read = number_of_bytes_to_read
@@ -267,9 +267,9 @@ def case_write(sock, buf, length):
                 sock.state == TCPState.CLOSE_WAIT
                 )
 
-            if sock.window.last_byte_written - sock.window.last_byte_acked < WINDOW_SIZE and can_send_data:
+            if sock.window.last_byte_written - sock.window.last_byte_acked < MAX_NETWORK_BUFFER and can_send_data:
 
-                number_of_bytes_available_in_buffer = WINDOW_SIZE - (sock.window.last_byte_written - sock.window.last_byte_acked)
+                number_of_bytes_available_in_buffer = MAX_NETWORK_BUFFER - (sock.window.last_byte_written - sock.window.last_byte_acked)
                 first_empty_index_in_buffer = (sock.window.last_byte_written - sock.window.last_byte_acked)
 
                 number_of_bytes_to_write_into_buffer = min(number_of_bytes_available_in_buffer, len(total_data_to_send))
@@ -297,9 +297,9 @@ def case_write(sock, buf, length):
                 sock.state == TCPState.CLOSE_WAIT
                 )
 
-            if sock.window.last_byte_written - sock.window.last_byte_acked < WINDOW_SIZE and can_send_data:
+            if sock.window.last_byte_written - sock.window.last_byte_acked < MAX_NETWORK_BUFFER and can_send_data:
 
-                number_of_bytes_available_in_buffer = WINDOW_SIZE - (sock.window.last_byte_written - sock.window.last_byte_acked)
+                number_of_bytes_available_in_buffer = MAX_NETWORK_BUFFER - (sock.window.last_byte_written - sock.window.last_byte_acked)
                 first_empty_index_in_buffer = (sock.window.last_byte_written - sock.window.last_byte_acked)
 
                 number_of_bytes_to_write_into_buffer = min(number_of_bytes_available_in_buffer, len(total_data_to_send))
