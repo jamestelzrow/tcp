@@ -262,8 +262,9 @@ def handle_message(sock, pkt):
 
                     for payload_subset_idx in range(len(payload_subset_to_accept)):
                         sock.receivedBuf[rcv_buff_starting_index_for_copy + payload_subset_idx] = payload_subset_to_accept[payload_subset_idx]
-                    if len(payload_subset_to_accept) > 0:
-                        # We have received some new data, so we should notify in case the application layer is waiting on it.
+
+                    # We only want to notify the application layer if we now have the next byte after last_byte_read.
+                    if len(payload_subset_to_accept) > 0 and packet_sequence_number <= sock.window.last_byte_read + 1:
                         sock.recvCond.notify()
 
                     if packet_sequence_number <= sock.window.next_byte_expected:

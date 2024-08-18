@@ -217,6 +217,7 @@ def case_read(sock, buf, length, flags):
                 sock.state == TCPState.CLOSED
                 ):
                 # The user is not willing to wait for some new data, and there isn't any available right now.
+                buf[0] = bytes(b"")
                 must_wait_to_read = False
             else:
                 # There isn't any data available right now, but the user wants to wait for it.
