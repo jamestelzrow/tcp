@@ -26,6 +26,9 @@ def handle_message(sock, pkt):
     # Note: This is not used if the received packet doesn't have the ACK flag set
     packet_ack_num = None
 
+    payload = tcpHeader[packet.CaseTCP].payload
+    payload_length = len(payload)
+
     if (flags & packet.ACK_FLAG_MASK) and (flags & packet.FIN_FLAG_MASK):
         if sock.state == TCPState.FIN_WAIT_1 and \
         ackNum == sock.window.last_byte_sent + 1 and \
@@ -54,10 +57,11 @@ def handle_message(sock, pkt):
             pass
 
     elif flags & packet.ACK_FLAG_MASK and \
+    payload_length == 0 and \
     sock.state != TCPState.SYN_RCVD and \
     sock.state != TCPState.ESTABLISHED and \
     sock.state != TCPState.CLOSE_WAIT:
-        # Here, we do NOT want to handle ACK packets that are acknowledging new data.
+        # Here, we do NOT want to handle ACK packets that are acknowledging new data, and we do NOT want to handle ACK packets that contain new data.
         # We can't be in the FIN_WAIT_1, FIN_WAIT_2, CLOSING, TIME_WAIT or LAST_ACK states without sending a FIN message first,
         # and we can't send a FIN message until all data that we have sent has been ACKed.
         # So, we enter this conditional in these states.
@@ -243,9 +247,6 @@ def handle_message(sock, pkt):
 
         if flags & packet.ACK_FLAG_MASK:
             packet_ack_num = ackNum
-
-        payload = tcpHeader[packet.CaseTCP].payload
-        payload_length = len(payload)
 
         if payload_length > 0:
             if (sock.window.next_byte_expected - 1) - sock.window.last_byte_read < MAX_NETWORK_BUFFER:
