@@ -1,0 +1,5 @@
+sudo iptables -A INPUT -m statistic --mode random --probability 0.2 -p udp (drop UDP packets with a probability of 0.2)
+sudo iptables -D INPUT -m statistic --mode random --probability 0.2 -p udp (to undo the command above)
+
+sudo tc qdisc add dev lo root netem delay 2s 20ms (2 seconds delay and 20ms jitter)
+sudo tc qdisc del dev lo root netem delay 2s 20ms (to undo the command above; may need to use name other than lo depending on what interface we use for tests)
